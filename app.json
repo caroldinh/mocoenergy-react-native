@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mocoenergy",
-    "slug": "mocoenergy",
+    "name": "mocoenergy-test-8-8-2021",
+    "slug": "mocoenergy-test-8-8-2021",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -27,6 +27,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "description": "A mobile app to track your energy-spending habits."
   }
 }
