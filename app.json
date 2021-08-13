@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "mocoenergy-test-8-8-2021",
-    "slug": "mocoenergy-test-8-8-2021",
+    "name": "mocoenergy-test-8-10-2021",
+    "slug": "mocoenergy-test-8-10-2021",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "resizeMode": "cover",
+      "backgroundColor": "#98C238"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -22,12 +22,12 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#98C238"
       }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "description": "A mobile app to track your energy-spending habits."
+    "description": "A mobile app to track your energy-saving habits."
   }
 }

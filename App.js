@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { Component, useState } from 'react';
 import { render } from 'react-dom';
-import { StyleSheet, Dimensions, Text, View, Switch, Image, TextInput, TouchableOpacity, TouchableHighlight, CheckBox, ScrollView } from 'react-native';
+import { StyleSheet, Dimensions, Text, View, Switch, Image, TextInput, TouchableOpacity, ActivityIndicator, CheckBox, ScrollView, Linking } from 'react-native';
 import { Button} from 'react-native-elements';
 import firebase from './firebase.js'
 import Constants from 'expo-constants';
@@ -23,26 +23,64 @@ class Login extends Component{
   constructor(props){
     
     super(props);
-    this.switchMode = this.switchMode.bind(this);
+    this.goToLogin = this.goToLogin.bind(this);
+    this.goToRegister = this.goToRegister.bind(this);
+    this.goToReset = this.goToReset.bind(this);
     this.login = this.login.bind(this);
     this.register = this.register.bind(this);
+    this.resetPassword = this.resetPassword.bind(this);
     this.state = {
       display: "",
       email: "",
       password: "",
       password2: "",
-      register: true,
+      mode: 'register',
     };
   }
 
-  switchMode(){
+  goToRegister(){
     this.setState({
       display: "",
       email: "",
       password: "",
       password2: "",
-      register: !this.state.register,
+      mode: 'register',
     });
+  }
+
+  goToLogin(){
+    this.setState({
+      display: "",
+      email: "",
+      password: "",
+      password2: "",
+      mode: 'login',
+    });
+  }
+
+  goToReset(){
+    this.setState({
+      display: "",
+      email: "",
+      password: "",
+      password2: "",
+      mode: 'reset',
+    });
+  }
+
+  resetPassword(){
+    let email = this.state.email;
+    firebase.auth().sendPasswordResetEmail(email)
+      .then(() => {
+        this.goToLogin();
+        alert("Reset link sent successfully. Check your inbox for the reset link.")
+      })
+      .catch((error) => {
+        var errorCode = error.code;
+        var errorMessage = error.message;
+        alert(errorMessage);
+      });
+
   }
 
   register(){
@@ -104,7 +142,7 @@ class Login extends Component{
   }
 
   render(){
-    if(this.state.register){
+    if(this.state.mode == 'register'){
     return(
       <View>
         <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
@@ -113,17 +151,28 @@ class Login extends Component{
         <TextInput id="password1" secureTextEntry={true} onChangeText={(password) => this.setState({password})} style={styles.textInput} placeholder="Password"/>
         <TextInput id="password2" secureTextEntry={true} onChangeText={(password2) => this.setState({password2})} style={styles.textInput} placeholder="Confirm Password"/>
         <Button id="register" onPress={this.register} titleStyle={styles.buttonTitle} buttonStyle={styles.button} title="REGISTER"/>
-        <TouchableOpacity onPress={this.switchMode}><Text style={styles.link}>Already have an account? Login.</Text></TouchableOpacity>
+        <TouchableOpacity onPress={this.goToLogin}><Text style={styles.link}>Already have an account? Login.</Text></TouchableOpacity>
       </View>
     );
-    } else{
+    } else if(this.state.mode == 'login'){
       return(
         <View>
         <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
         <TextInput id="email" onChangeText={(email) => this.setState({email})} style={styles.textInput} placeholder="Email Address"/>
         <TextInput id="password" secureTextEntry={true} onChangeText={(password) => this.setState({password})} style={styles.textInput} placeholder="Password"/>
         <Button id="login" onPress={this.login} titleStyle={styles.buttonTitle} buttonStyle={styles.button} title="LOG IN"/>
-        <TouchableOpacity onPress={this.switchMode}><Text style={styles.link}>Need an account? Register.</Text></TouchableOpacity>
+        <TouchableOpacity onPress={this.goToReset}><Text style={styles.link}>Forgot password?</Text></TouchableOpacity>
+        <TouchableOpacity onPress={this.goToRegister}><Text style={styles.link}>Need an account? Register.</Text></TouchableOpacity>
+        </View>
+      );
+    } else if(this.state.mode == 'reset'){
+      return(
+        <View>
+        <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
+        
+        <TextInput id="email" onChangeText={(email) => this.setState({email})} style={styles.textInput} placeholder="Email Address"/>
+        <Button id="reset" onPress={this.resetPassword} titleStyle={styles.buttonTitle} buttonStyle={styles.button} title="SEND RESET LINK"/>
+        <TouchableOpacity onPress={this.goToLogin}><Text style={styles.link}>Back to login</Text></TouchableOpacity>
         </View>
       );
     }
@@ -170,7 +219,12 @@ class SelectTasks extends Component{
     if(categories.length >= 4){
       dbInProg.set(this.state.selectedTasks);
       dbComplete.set([]);
-      this.props.selectHandler();
+      if(this.props.selectHandler){
+        this.props.selectHandler();
+      } else {
+        this.props.route.params.selectHandler();
+        this.props.navigation.navigate('Dashboard');
+      }
     } else {
       alert("Please select at least one task per category.")
     }
@@ -250,12 +304,12 @@ class Dashboard extends Component{
         }
 
         let today = new Date();
-        today.setHours(0,0,0,0)
+        today.setHours(0,0,0,0);
         //console.log(today);
         const resetTasks = async () => {
           try {
             const value = await AsyncStorage.getItem('@last_opened'); 
-            if(value != today.toString() || value == null) { // If the date last opened was not today
+            if(value != today.toString() || value == null) { // If the date last opened was not today 
 
               // Reset all tasks
               inProgress.forEach(function(task){
@@ -265,7 +319,9 @@ class Dashboard extends Component{
                 }
               });
               console.log("Flag");
+              let pointsGained = 0;
               complete.forEach(function(task){
+                pointsGained += task.pointVal;
                 if(task.streak){
                   task.streak += 1;
                 } else {
@@ -294,6 +350,24 @@ class Dashboard extends Component{
               let dbComplete = firebase.database().ref().child("users").child(uid).child("complete");
               dbInProg.set(inProgress);
               dbComplete.set(complete);
+
+              dbRef.child("users").child(uid).get().then((snapshot) => {
+                if (snapshot.exists()) {
+                  let user = snapshot.val();
+                  let newPoints = null;
+                  if(user.points){
+                    newPoints = user.points + pointsGained;
+                  } else{
+                    newPoints = pointsGained;
+                  }
+                  let dbUserPoints = firebase.database().ref().child("users").child(uid).child("points");
+                  dbUserPoints.set(newPoints);
+                } else {
+                  console.log("No data available");
+                }
+              }).catch((error) => {
+                console.error(error);
+              });
               
             }
               
@@ -345,22 +419,14 @@ class Dashboard extends Component{
 
     if(this.state.inProgress == null && this.state.inProgress == [] && this.state.complete == null && this.state.complete == []){
       return(
-        <ScrollView style={styles.scrollView}>
-          <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
-          <Text style={styles.h1}>Welcome, {this.state.user.displayName}!</Text>
-          <Text style={styles.p}>You've earned {this.state.points} points today.</Text>
-          <Text style={styles.h2}>In Progress</Text>
-          <Text style={styles.p}>None</Text>
-          <Text style={styles.h2}>Completed</Text>
-          <Text style={styles.p}>Nothing here yet!</Text>
-        </ScrollView>
+        <Loading/>
       );
     } else if(this.state.inProgress != null && this.state.inProgress != [] && (this.state.complete == null || this.state.complete == [])){
       return(
         <ScrollView style={styles.scrollView}>
         <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
         <Text style={styles.h1}>Welcome, {this.state.user.displayName}!</Text>
-        <Text style={styles.p}>You've earned {this.state.points} points today.</Text>
+        <Text style={styles.h3}>You've earned {this.state.points} points today.</Text>
         <Text style={styles.h2}>In Progress</Text> 
         {Object.keys(this.state.inProgress).map(task => this.state.inProgress[task].data == "boolean" ? (
           <BooleanTask task={this.state.inProgress[task]} handleCheck={this.handleCheck} completed={false} />
@@ -376,7 +442,7 @@ class Dashboard extends Component{
         <ScrollView style={styles.scrollView}>
           <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
           <Text style={styles.h1}>Welcome, {this.state.user.displayName}!</Text>
-          <Text style={styles.p}>You've earned {this.state.points} points today.</Text>
+          <Text style={styles.h3}>You've earned {this.state.points} points today.</Text>
           <Text style={styles.h2}>In Progress</Text> 
           <Text style={styles.p}>Congrats! You're done for the day!</Text>
           <Text style={styles.h2}>Completed</Text>
@@ -392,7 +458,7 @@ class Dashboard extends Component{
         <ScrollView style={styles.scrollView}>
           <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
           <Text style={styles.h1}>Welcome, {this.state.user.displayName}!</Text>
-          <Text style={styles.p}>You've earned {this.state.points} points today.</Text>
+          <Text style={styles.h3}>You've earned {this.state.points} points today.</Text>
           <Text style={styles.h2}>In Progress</Text> 
           {Object.keys(this.state.inProgress).map(task => this.state.inProgress[task].data == "boolean" ? (
           <BooleanTask task={this.state.inProgress[task]} handleCheck={this.handleCheck} completed={false} />
@@ -458,7 +524,16 @@ class IntTask extends Component{
   render(){
 
     return(
-      <TouchableOpacity style={[styles.card, {backgroundColor: this.state.backgroundColor}]}>
+      <TouchableOpacity style={[styles.card, {
+        backgroundColor: this.state.backgroundColor, shadowColor: this.state.backgroundColor,
+        shadowOffset: {
+          width: 0,
+          height: 12,
+        },
+        shadowOpacity: 0.58,
+        shadowRadius: 16.00,
+        
+        elevation: 24,}]}>
           <TextInput id="input" value={this.state.input} onChangeText={(input) => this.setState({input})} onBlur={this.verify} keyboardType = 'numeric' style={styles.cardInput} placeholder="0"/>
           <View style={styles.cardTextWrap}>
             <Text style={[styles.cardHeader]}>{this.props.task.name}</Text>
@@ -508,7 +583,16 @@ class BooleanTask extends Component{
 
   render(){
     return(
-      <TouchableOpacity style={[styles.card, {backgroundColor: this.state.backgroundColor}]} onPress={this.toggleSwitch}>
+      <TouchableOpacity style={[styles.card, {backgroundColor: this.state.backgroundColor, 
+        shadowColor: this.state.backgroundColor,
+        shadowOffset: {
+          width: 0,
+          height: 12,
+        },
+        shadowOpacity: 0.58,
+        shadowRadius: 16.00,
+        
+        elevation: 24,}]} onPress={this.toggleSwitch}>
           <Switch
             trackColor={{ false: "#767577", true: "#498d13"}}
             thumbColor={this.state.input ? "#adf427" : "#f4f3f4"}
@@ -563,7 +647,16 @@ class CheckTask extends Component{
 
   render(){
     return(
-      <TouchableOpacity style={[styles.card, {backgroundColor: this.state.backgroundColor}]} onPress={this.check}>
+      <TouchableOpacity style={[styles.card, {
+        backgroundColor: this.state.backgroundColor, shadowColor: this.state.backgroundColor,
+        shadowOffset: {
+          width: 0,
+          height: 12,
+        },
+        shadowOpacity: 0.58,
+        shadowRadius: 16.00,
+        
+        elevation: 24,}]} onPress={this.check}>
           <CheckBox
             value={this.state.selected}
             onValueChange={this.check}
@@ -582,6 +675,38 @@ class CheckTask extends Component{
   }
 }
 
+function Loading(){
+  return(<ActivityIndicator size="large" color="#98C238" />);
+}
+
+class About extends React.Component{
+  constructor(props){
+    super(props);
+    this.openMEC = this.openMEC.bind(this);
+  }
+  openMEC(){
+    Linking.canOpenURL('https://montgomeryenergyconnection.org/').then(supported => {
+      if (supported) {
+        Linking.openURL('https://montgomeryenergyconnection.org/');
+      } else {
+        console.log("Don't know how to open URI: " + 'https://montgomeryenergyconnection.org/');
+      }
+    });
+  }
+  render(){
+    return(
+      <ScrollView style={[styles.scrollView]}>
+        <Text style={styles.h1}>About This App</Text>
+        <Text style={styles.p}>[MEC APP NAME] is a mobile app to encourage sustainable energy habits. The habits you build here will help you not help the planet, but also cut down on your electricity bill!</Text>
+        <Text style={styles.p}>This app was initially developed for residents of Montgomery County, Maryland, but MEC's tasks will help you save energy regardless of where you're from.</Text>
+        <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
+        <Text style={styles.h2}>About Montgomery Energy Connection</Text>
+        <Text style={styles.p}>Montgomery Energy Connection is an outreach network and resource hub managed by the Department of Environmental Protection and the Department of Health and Human Services Office of Home Energy Programs. Its goal is to provide community-level education and assistance on energy efficiency to Montgomery County residents. Learn more on their website at <TouchableOpacity onPress={this.openMEC}><Text style={styles.link}>https://montgomeryenergyconnection.org/.</Text></TouchableOpacity></Text>
+      </ScrollView>
+    );
+  }
+}
+
 
 const Drawer = createDrawerNavigator();
 
@@ -589,6 +714,7 @@ class App extends React.Component{
   constructor(props){
     super(props);
     this.goToDashboard = this.goToDashboard.bind(this);
+    this.forceAppUpdate = this.forceAppUpdate.bind(this);
     this.handleRegister = this.handleRegister.bind(this);
     this.loadFonts = this.loadFonts.bind(this);
     this.state = {
@@ -599,12 +725,24 @@ class App extends React.Component{
   }
 
   goToDashboard(user){
+    console.log("Going to Dashboard");
     this.setState({
       currUser: user,
       activity: 'dashboard',
     });
-    const navigation = useNavigation();
-    navigation.navigate('Dashboard');
+    //const navigation = useNavigation();
+    //navigation.navigate('Dashboard');
+  }
+
+  async forceAppUpdate(){
+    console.log("forcing update");
+    this.setState({
+      activity: 'loading'
+    });
+    await sleep(100);
+    this.setState({
+      activity: 'dashboard'
+    });
   }
 
   handleRegister(user){
@@ -617,7 +755,7 @@ class App extends React.Component{
   async loadFonts() {
     await Font.loadAsync({
 
-      'MyriadPro': require('./assets/fonts/MyriadPro-Regular.otf'),
+      'MyriadPro': require('./assets/fonts/MyriadPro-Regular.ttf'),
       'MyriadPro-Bold': require('./assets/fonts/MyriadPro-Bold.otf'),
       'MyriadPro-Light': require('./assets/fonts/MyriadPro-Light.otf'),
 
@@ -641,15 +779,33 @@ class App extends React.Component{
 
   render() {
 
-    if (this.state.fontsLoaded) {
+    if(this.state.fontsLoaded){
 
       switch(this.state.activity){
         case 'dashboard':
           return(
               <NavigationContainer style={styles.container}>
-                <Drawer.Navigator initialRouteName="Dashboard">   
+                <Drawer.Navigator initialRouteName="Dashboard" screenOptions={{
+                    headerStyle: {
+                      backgroundColor: '#98C238',
+                      alignContent: 'center',
+                    },
+                    headerTintColor: '#296391',
+                    headerTitleStyle: {
+                      fontWeight: 'bold',
+                      alignSelf: 'center',
+                    },
+                    drawerActiveBackgroundColor: '#98C238',
+                    drawerInactiveBackgroundColor: '#98C238',
+                    drawerActiveTintColor: '#296391',
+                    drawerStyle: {
+                      backgroundColor: '#98C238',
+                      fontWeight: 'bold',
+                    }
+                  }}>   
                     <Drawer.Screen name="Dashboard" component={Dashboard} />
-                    <Drawer.Screen name="My Tasks" component={() => <SelectTasks selectHandler={this.goToDashboard}/>}/>
+                    <Drawer.Screen name="My Tasks" component={SelectTasks} initialParams={{ selectHandler: this.forceAppUpdate }} />
+                    <Drawer.Screen name="About" component={About} />
                 </Drawer.Navigator>
                 <StatusBar style="auto" />
               </NavigationContainer>
@@ -661,19 +817,32 @@ class App extends React.Component{
               <StatusBar style="auto" />
             </View>
           );
+        case 'loading':
+          return(
+          <View style={styles.container}>
+             <Loading/>
+             <StatusBar style="auto" />
+          </View>
+            );
         default:
           return(
             <View style={styles.container}>
-              <Login loginHandler={this.handleLogin} registerHandler={this.handleRegister}></Login>
+              <Login loginHandler={this.goToDashboard} registerHandler={this.handleRegister}></Login>
               <StatusBar style="auto" />
             </View>
           );
       }
     }
     else{
-      return null;
+      return(
+        <View style={styles.container}>
+           <Loading/>
+           <StatusBar style="auto" />
+        </View>
+          );
     }
   }
+
 
 }
 
@@ -682,32 +851,41 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: '#99ca3c',
     width: 0.8 * win.width,
-    padding: 10,
+    padding: 12,
     marginBottom: 12,
+    borderRadius: 20,
+    fontFamily: 'MyriadPro',
   },
 
   buttonHover: {
-    backgroundColor: '#99ca3c',
+    backgroundColor: '#296391',
+    width: 0.3 * win.width,
+    padding: 12,
+    borderRadius: 20,
+    fontFamily: 'MyriadPro',
   },
 
   buttonTitle:{
     color: 'white',
     fontSize: 18,
+    fontFamily: 'MyriadPro',
   },
 
   card: {
     backgroundColor: '#333',
     borderRadius: 25,
-    width: '100%',
+    width: '90%',
     padding: 15,
     marginBottom: 15,
     flexDirection: 'row',
+    alignSelf: 'center',
   },
 
   cardBody: {
     color: '#fff',
     fontSize: 15,
     marginBottom: 8,
+    fontFamily: 'MyriadPro',
   },
 
   cardCategory: {
@@ -715,6 +893,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 3,
     flex: 1.5,
+    fontFamily: 'MyriadPro',
   },
 
   cardHeader: {
@@ -722,6 +901,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 8,
+    fontFamily: 'MyriadPro',
   },
 
   cardInput:{
@@ -739,6 +919,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 0,
     borderBottomWidth: 2,
     borderColor: '#498d13',
+    fontFamily: 'MyriadPro',
   },
 
   cardNote:{
@@ -747,6 +928,7 @@ const styles = StyleSheet.create({
     marginBottom: 3,
     flex: 1, 
     marginBottom: 12,
+    fontFamily: 'MyriadPro',
   },
 
   cardSmall: {
@@ -754,6 +936,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 3,
     flex: 1,
+    fontFamily: 'MyriadPro',
   },
 
   cardSmallWrap:{
@@ -780,6 +963,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: win.width,
     marginTop: Constants.statusBarHeight,
+    fontFamily: 'MyriadPro',
   },
 
   fixedView : {
@@ -802,6 +986,14 @@ const styles = StyleSheet.create({
   h2: {
     color: '#666',
     fontSize: 20,
+    textAlign: 'center',
+    marginBottom: 10,
+    marginTop: 10,
+  },
+
+  h3: {
+    color: '#666',
+    fontSize: 18,
     textAlign: 'center',
     marginBottom: 10,
     marginTop: 10,
@@ -832,14 +1024,18 @@ const styles = StyleSheet.create({
   p: {
     color: '#666',
     fontSize: 15,
-    textAlign: 'center',
+    textAlign: 'justify',
     marginBottom: 15,
+    width: '90%',
+    alignSelf: 'center',
+    lineHeight: 25,
+    fontFamily: 'MyriadPro',
   },
 
   scrollView:{
     width: win.width,
     flexGrow: 1,
-    paddingHorizontal: '7%',
+    paddingHorizontal: '0%',
   },
 
   switch:{
@@ -853,9 +1049,10 @@ const styles = StyleSheet.create({
   textInput:{
     maxWidth: 0.8 * win.width,
     fontSize: 18,
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     marginBottom: 12,
+    borderRadius: 20,
   },
 
 });
