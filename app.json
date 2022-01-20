@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "mocoenergy-test-8-10-2021",
-    "slug": "mocoenergy-test-8-10-2021",
-    "version": "1.0.0",
+    "name": "Energy Link",
+    "slug": "energylink-alpha",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "splash": {
@@ -17,13 +17,17 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.power.energylink",
+      "buildNumber": "0.1.0"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#98C238"
-      }
+      },
+      "package": "com.montgomeryenergyconnection.energylink",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"

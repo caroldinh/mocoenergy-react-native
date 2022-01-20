@@ -1,7 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { Component, useState } from 'react';
-import { render } from 'react-dom';
-import { StyleSheet, Dimensions, Text, View, Switch, Image, TextInput, TouchableOpacity, ActivityIndicator, CheckBox, ScrollView, Linking } from 'react-native';
+import { StyleSheet, Dimensions, Text, View, Switch, Image, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Linking } from 'react-native';
 import { Button} from 'react-native-elements';
 import firebase from './firebase.js'
 import Constants from 'expo-constants';
@@ -9,7 +8,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Font from 'expo-font';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { NavigationContainer } from '@react-navigation/native';
-import { useNavigation } from '@react-navigation/native';
 
 const win = Dimensions.get('window');
 
@@ -19,6 +17,7 @@ function sleep(ms) {
   });
 }
 
+// Component for the login and register screen. The first thing users see upon opening the app, if they are not signed in.
 class Login extends Component{
   constructor(props){
     
@@ -38,6 +37,8 @@ class Login extends Component{
       mode: 'register',
     };
   }
+
+  // Functions to switch between the different "states" of the login screen.
 
   goToRegister(){
     this.setState({
@@ -79,6 +80,7 @@ class Login extends Component{
     });
   }
 
+  // Reset the user's password if they forgot it.
   resetPassword(){
     let email = this.state.email;
     firebase.auth().sendPasswordResetEmail(email)
@@ -89,20 +91,26 @@ class Login extends Component{
       .catch((error) => {
         var errorCode = error.code;
         var errorMessage = error.message;
-        alert(errorMessage);
+        alert("Could not send reset link. Please try again.");
       });
 
   }
 
+  // Register the user for an account.
   register(){
       let display = this.state.display;
       let email = this.state.email;
       let password1 = this.state.password;
       let password2 = this.state.password2;
+
+      // If the passwords match and if they are more than six characters, and if the email address is properly formatted...
       if(password1 == password2 && password1.length > 6 && email.indexOf("@") != -1 && email.indexOf(".") != -1){
+
+        // Authenticate the user with firebase.
         firebase.auth().createUserWithEmailAndPassword(email, password1)
+
         .then((userCredential) => {
-          // Signed in 
+          // The user is now signed in. Save their profile and send them a verification email.
           var user = userCredential.user;
           this.props.registerHandler(user);
           user.updateProfile({
@@ -117,15 +125,23 @@ class Login extends Component{
             inProgress:[],
             complete:[],
           });
+
+          // Store the user's credentials so that they remain signed in.
+          AsyncStorage.setItem("@userEmail", email);
+          AsyncStorage.setItem("@userPassword", password);
+
           return;
         })
+
+        // Otherwise, display the error message.
         .catch((error) => {
           var errorCode = error.code;
           var errorMessage = error.message;
           alert(errorMessage);
         });
     } else{
-      alert("Error");
+
+      // Display error messages if the credentials are invalid.
       if(password1 != password2){
         alert("Passwords must match");
       } else if(password1.length <= 6){
@@ -141,8 +157,13 @@ class Login extends Component{
       let password = this.state.password;
       firebase.auth().signInWithEmailAndPassword(email, password)
       .then((userCredential) => {
-        // Signed in
+        // The user is now signed in.
         var user = userCredential.user;
+
+        // Store the user's credentials so that they remain signed in.
+        AsyncStorage.setItem("@userEmail", email);
+        AsyncStorage.setItem("@userPassword", password);
+
         this.props.loginHandler(user);
       })
       .catch((error) => {
@@ -155,7 +176,7 @@ class Login extends Component{
   render(){
     if(this.state.mode == 'register'){
     return(
-      <View>
+      <ScrollView style={[styles.scrollView]}>
         <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
         <Text style={styles.h1}>Energy Link</Text>
         <TextInput id="displayName" onChangeText={(display) => this.setState({display})} style={styles.textInput} placeholder="Display Name"/>
@@ -165,11 +186,11 @@ class Login extends Component{
         <Button id="register" onPress={this.register} titleStyle={styles.buttonTitle} buttonStyle={styles.button} title="REGISTER"/>
         <TouchableOpacity onPress={this.showAbout}><Text style={styles.link}>New here? Learn more!</Text></TouchableOpacity>
         <TouchableOpacity onPress={this.goToLogin}><Text style={styles.link}>Already have an account? Login.</Text></TouchableOpacity>
-      </View>
+      </ScrollView>
     );
     } else if(this.state.mode == 'login'){
       return(
-        <View>
+        <ScrollView style={[styles.scrollView]}>
         <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
         <Text style={styles.h1}>Energy Link</Text>
         <TextInput id="email" onChangeText={(email) => this.setState({email})} style={styles.textInput} placeholder="Email Address"/>
@@ -177,18 +198,18 @@ class Login extends Component{
         <Button id="login" onPress={this.login} titleStyle={styles.buttonTitle} buttonStyle={styles.button} title="LOG IN"/>
         <TouchableOpacity onPress={this.goToReset}><Text style={styles.link}>Forgot password?</Text></TouchableOpacity>
         <TouchableOpacity onPress={this.goToRegister}><Text style={styles.link}>Need an account? Register.</Text></TouchableOpacity>
-        </View>
+        </ScrollView>
       );
     } else if(this.state.mode == 'reset'){
       return(
-        <View>
+        <ScrollView style={[styles.scrollView]}>
         <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
         <Text style={styles.h1}>Energy Link</Text>
         <Text style={styles.h2}>Forgot your password?</Text>
         <TextInput id="email" onChangeText={(email) => this.setState({email})} style={styles.textInput} placeholder="Email Address"/>
         <Button id="reset" onPress={this.resetPassword} titleStyle={styles.buttonTitle} buttonStyle={styles.button} title="SEND RESET LINK"/>
         <TouchableOpacity onPress={this.goToLogin}><Text style={styles.link}>Back to login</Text></TouchableOpacity>
-        </View>
+        </ScrollView>
       );
     } else {
       return(
@@ -206,60 +227,105 @@ class SelectTasks extends Component{
     this.selectTasks = this.selectTasks.bind(this);
     this.state = {
       tasks: null,
-      selectedTasks: [],
+      selectedTasks: {},
     };
   }
 
-  addTask(task){
-    let index = this.state.selectedTasks.indexOf(task);
+  // This method is passed as a prop (handleAdd) in CheckTask
+  addTask(task, key){
     let tempSelectedTasks = this.state.selectedTasks;
-    if(index > -1){
-     tempSelectedTasks.splice(index, 1);
+    if(tempSelectedTasks[key] != null){
+     delete tempSelectedTasks[key];
     } else {
-     tempSelectedTasks.push(task);
+     tempSelectedTasks[key] = task;
     }
     this.setState({selectedTasks: tempSelectedTasks});
-    //console.log(this.state.selectedTasks);
   }
 
   selectTasks(){
     let currUser = firebase.auth().currentUser;
     let uid = currUser.uid;
+
+    // Get database references for the user's tasks
+    // (References - NOT the actual values)
     let dbInProg = firebase.database().ref().child("users").child(uid).child("inProgress");
     let dbComplete = firebase.database().ref().child("users").child(uid).child("complete");
-    let categories = []
+    let categories = [];
 
-    this.state.selectedTasks.forEach(function(task){
-      //console.log(task);
-      //console.log(task["category"]);
+    let selectedTasks = this.state.selectedTasks;
+
+    Object.values(this.state.selectedTasks).forEach(function(task){
+
+      console.log(task);
+
+      // Count how many categories are represented by the selected tasks.
       if(categories.indexOf(task.category) == -1){
         categories.push(task.category);
       }});
-    //console.log(categories);
-    if(categories.length >= 4){
-      dbInProg.set(this.state.selectedTasks);
-      dbComplete.set([]);
-      if(this.props.selectHandler){
-        this.props.selectHandler();
+
+      // Update the tasks list of the user has selected from all 4 categories.
+      if(categories.length >= 4){
+
+        let newTasks = {};
+        let completedTasks = {};
+        Object.keys(selectedTasks).forEach(taskKey => {
+        
+          let inProgress = this.state.inProgress;
+          let complete = this.state.complete;
+
+          // If the task is already in inProgress, keep it
+          if(inProgress != null && inProgress != undefined && Object.keys(inProgress).indexOf(taskKey) != -1){
+            newTasks[taskKey] = inProgress[taskKey];
+
+          // If the task is already in complete, keep it
+          } else if(complete != null && complete != undefined && Object.keys(complete).indexOf(taskKey) != -1){
+            completedTasks[taskKey] = complete[taskKey];
+
+          // Otherwise, add the new task
+          } else {
+            newTasks[taskKey] = selectedTasks[taskKey];
+          }
+
+        });
+
+        dbInProg.set(newTasks);
+        dbComplete.set(completedTasks);
+        if(this.props.selectHandler){
+          this.props.selectHandler();
+        } else {
+          this.props.route.params.selectHandler();
+          this.props.navigation.navigate('Dashboard');
+        }
       } else {
-        this.props.route.params.selectHandler();
-        this.props.navigation.navigate('Dashboard');
+        alert("Please select at least one task per category.")
       }
-    } else {
-      alert("Please select at least one task per category.")
-    }
     
   }
 
   componentDidMount(){
     const dbRef = firebase.database().ref();
     let currUser = firebase.auth().currentUser;
+
+    // Get the list of all tasks available.
     dbRef.child("tasks").get().then((snapshot) => {
       if (snapshot.exists()) {
-        //console.log(snapshot);
         let tasks = snapshot.val();
-        //console.log(tasks);
-        this.setState({ tasks: tasks });
+
+        // Get the user's current tasks, if they exist.
+        let currUser = firebase.auth().currentUser;
+        let uid = currUser.uid;
+
+        dbRef.child("users").child(uid).get().then((snapshot) => {
+          let inProgress = {};
+          let complete = {};
+          if (snapshot.exists()) {
+            inProgress = snapshot.child("inProgress").val();
+            complete = snapshot.child("complete").val();
+          }
+
+          // Update the state to contain the available tasks and the user's currently selected tasks.
+          this.setState({ tasks: tasks, inProgress: inProgress, complete: complete });
+        });
       } else {
         console.log("No data available");
       }
@@ -279,8 +345,8 @@ class SelectTasks extends Component{
         <ScrollView style={styles.scrollView}>
           <Text style={styles.h2}>Choose My Tasks</Text>
           <Text style={styles.h3}>Please select at least one per category.</Text>
-          {Object.keys(this.state.tasks).map(task => (
-            <CheckTask task={this.state.tasks[task]} handleAdd={this.addTask}/>
+          {Object.keys(this.state.tasks).map(taskKey => (
+            <CheckTask task={this.state.tasks[taskKey]} handleAdd={this.addTask} taskKey={taskKey}/>
           ))}
         </ScrollView>
         <View style={styles.fixedView}>
@@ -318,7 +384,7 @@ class Dashboard extends Component{
         if(complete == null){
           complete = [];
         } else{
-          complete.forEach(function(task){
+          Object.values(complete).forEach(function(task){
             pointCount += task.pointVal;
             });
         }
@@ -340,7 +406,7 @@ class Dashboard extends Component{
               });
               //console.log("Flag");
               let pointsGained = {water: 0, transportation: 0, home: 0, electricity: 0};
-              complete.forEach(function(task){
+              Object.values(complete).forEach(function(task){
                 //console.log(task.category);
                 if(task.category == "Water"){ pointsGained.water++; }
                 else if (task.category == "Transportation") { pointsGained.transportation++; }
@@ -416,24 +482,38 @@ class Dashboard extends Component{
     });
   }
 
-  handleCheck(task, input){
-    //console.log(task);
-    task.input = input;
+  // Move a task from inProgress to complete (or vice versa)
+  handleCheck(taskKey, input){
+    console.log(input);
+    let task;
     let tempInProgress = this.state.inProgress;
     let tempComplete = this.state.complete;
-    //console.log(this.state.complete);
-    if(tempInProgress.indexOf(task) > -1){
-      tempInProgress.splice(tempInProgress.indexOf(task), 1);
-      tempComplete.push(task);
-    } else{
-      tempComplete.splice(tempComplete.indexOf(task), 1);
-      tempInProgress.push(task);
+    console.log(taskKey);
+
+    // If the task is in in progress, swap it to complete
+    if(tempInProgress[taskKey] != null && tempInProgress[taskKey] != undefined){ 
+      task = tempInProgress[taskKey];
+      console.log(task);
+      task.input = input;
+      tempComplete[taskKey] = task;
+      delete tempInProgress[taskKey];
+
+    // If the task is complete, swap it to in progress
+    } else if(tempComplete[taskKey] != null && tempComplete[taskKey] != undefined){
+      task = tempComplete[taskKey];
+      console.log(task);
+      task.input = input;
+      tempInProgress[taskKey] = task;
+      delete tempComplete[taskKey];
     }
+
+    // Tally up the new point value
     let pointCount = 0;
-    tempComplete.forEach(function(task){
-      pointCount += task.pointVal
+    Object.values(tempComplete).forEach(function(task){
+      pointCount += task.pointVal;
     });
 
+    this.setState({ inProgress: {}, complete: {}, points: pointCount });
     this.setState({ inProgress: tempInProgress, complete: tempComplete, points: pointCount });
     let uid = firebase.auth().currentUser.uid;
     let dbInProg = firebase.database().ref().child("users").child(uid).child("inProgress");
@@ -444,27 +524,27 @@ class Dashboard extends Component{
 
   render(){
 
-    if(this.state.inProgress == null && this.state.inProgress == [] && this.state.complete == null && this.state.complete == []){
+    if(this.state.inProgress == null && this.state.inProgress == {} && this.state.complete == null && this.state.complete == {}){
       return(
         <Loading/>
       );
-    } else if(this.state.inProgress != null && this.state.inProgress != [] && (this.state.complete == null || this.state.complete == [])){
+    } else if(this.state.inProgress != null && this.state.inProgress != {} && (this.state.complete == null || this.state.complete == {})){
       return(
         <ScrollView style={styles.scrollView}>
         <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
         <Text style={styles.h1}>Welcome, {this.state.user.displayName}!</Text>
         <Text style={styles.h3}>You've earned {this.state.points} points today.</Text>
         <Text style={styles.h2}>In Progress</Text> 
-        {Object.keys(this.state.inProgress).map(task => this.state.inProgress[task].data == "boolean" ? (
-          <BooleanTask task={this.state.inProgress[task]} handleCheck={this.handleCheck} completed={false} />
+        {Object.keys(this.state.inProgress).map(taskKey => this.state.inProgress[taskKey].data == "boolean" ? (
+          <BooleanTask task={this.state.inProgress[taskKey]} taskKey={taskKey} handleCheck={this.handleCheck} completed={false} />
         ) : (
-          <IntTask task={this.state.inProgress[task]} handleCheck={this.handleCheck} completed={false}/>
+          <IntTask task={this.state.inProgress[taskKey]} taskKey={taskKey} handleCheck={this.handleCheck} completed={false}/>
         ))}
         <Text style={styles.h2}>Completed</Text>
         <Text style={styles.p}>Nothing here yet!</Text>
       </ScrollView>
       );
-    } else if((this.state.inProgress == null || this.state.inProgress == []) && this.state.complete != null && this.state.complete != []){
+    } else if((this.state.inProgress == null || this.state.inProgress == {}) && this.state.complete != null && this.state.complete != {}){
       return(
         <ScrollView style={styles.scrollView}>
           <Image source={require("./assets/mec_logo.png")} style={styles.logoImage} resizeMode="contain"/>
@@ -473,10 +553,10 @@ class Dashboard extends Component{
           <Text style={styles.h2}>In Progress</Text> 
           <Text style={styles.p}>Congrats! You're done for the day!</Text>
           <Text style={styles.h2}>Completed</Text>
-          {Object.keys(this.state.complete).map(task => this.state.complete[task].data == "boolean" ? (
-          <BooleanTask task={this.state.complete[task]} handleCheck={this.handleCheck} completed={true} />
+          {Object.keys(this.state.complete).map(taskKey => this.state.complete[taskKey].data == "boolean" ? (
+          <BooleanTask task={this.state.complete[taskKey]} taskKey={taskKey} handleCheck={this.handleCheck} completed={true} />
         ) : (
-          <IntTask task={this.state.complete[task]} handleCheck={this.handleCheck} completed={true}/>
+          <IntTask task={this.state.complete[taskKey]} taskKey={taskKey} handleCheck={this.handleCheck} completed={true}/>
         ))}
         </ScrollView>
       );
@@ -487,16 +567,16 @@ class Dashboard extends Component{
           <Text style={styles.h1}>Welcome, {this.state.user.displayName}!</Text>
           <Text style={styles.h3}>You've earned {this.state.points} points today.</Text>
           <Text style={styles.h2}>In Progress</Text> 
-          {Object.keys(this.state.inProgress).map(task => this.state.inProgress[task].data == "boolean" ? (
-          <BooleanTask task={this.state.inProgress[task]} handleCheck={this.handleCheck} completed={false} />
+          {Object.keys(this.state.inProgress).map(taskKey => this.state.inProgress[taskKey].data == "boolean" ? (
+          <BooleanTask task={this.state.inProgress[taskKey]} taskKey={taskKey} handleCheck={this.handleCheck} completed={false} />
         ) : (
-          <IntTask task={this.state.inProgress[task]} handleCheck={this.handleCheck} completed={false}/>
+          <IntTask task={this.state.inProgress[taskKey]} taskKey={taskKey} handleCheck={this.handleCheck} completed={false}/>
         ))}
           <Text style={styles.h2}>Completed</Text>
-          {Object.keys(this.state.complete).map(task => this.state.complete[task].data == "boolean" ? (
-          <BooleanTask task={this.state.complete[task]} handleCheck={this.handleCheck} completed={true} />
+          {Object.keys(this.state.complete).map(taskKey => this.state.complete[taskKey].data == "boolean" ? (
+          <BooleanTask task={this.state.complete[taskKey]} taskKey={taskKey} handleCheck={this.handleCheck} completed={true} />
         ) : (
-          <IntTask task={this.state.complete[task]} handleCheck={this.handleCheck} completed={true}/>
+          <IntTask task={this.state.complete[taskKey]} taskKey={taskKey} handleCheck={this.handleCheck} completed={true}/>
         ))}
         </ScrollView>
       )
@@ -541,10 +621,8 @@ class IntTask extends Component{
     } else{
       verified = this.state.input == checkVal;
     }
-    console.log(verified);
-    console.log(this.props.completed)
     if(verified != this.props.completed){
-      this.props.handleCheck(this.props.task, this.state.input);
+      this.props.handleCheck(this.props.taskKey, this.state.input);
     }
   }
 
@@ -605,7 +683,7 @@ class BooleanTask extends Component{
     this.setState({input: !this.props.completed});
     await sleep(300);
     this.setState({input: this.props.completed});
-    this.props.handleCheck(this.props.task, this.state.input);
+    this.props.handleCheck(this.props.taskKey, this.state.input);
   }
 
   render(){
@@ -669,7 +747,8 @@ class CheckTask extends Component{
 
   check(){
     this.setState({selected: !this.state.selected});
-    this.props.handleAdd(this.props.task);
+    //console.log(this.props.taskKey);
+    this.props.handleAdd(this.props.task, this.props.taskKey);
   }
 
   render(){
@@ -684,10 +763,14 @@ class CheckTask extends Component{
         shadowRadius: 16.00,
         
         elevation: 24,}]} onPress={this.check}>
-          <CheckBox
-            value={this.state.selected}
+
+          <Switch
+            trackColor={{ false: "#767577", true: "#498d13"}}
+            thumbColor={this.state.selected ? "#adf427" : "#f4f3f4"}
+            ios_backgroundColor="#3e3e3e"
             onValueChange={this.check}
-            style={styles.checkbox}
+            value={this.state.selected}
+            style={styles.switch}
           />
           <View style={styles.cardTextWrap}>
             <Text style={[styles.cardHeader]}>{this.props.task.name}</Text>
@@ -898,6 +981,8 @@ class MyAccount extends React.Component {
         if(sendVerification){
           newUser.sendEmailVerification();
           alert("Update successful. Please check your inbox to verify your new email address.");
+          // Store the user's new email so that they remain signed in.
+          AsyncStorage.setItem("@userEmail", user.email);
         } else {
           alert("Update successful.")
         }
@@ -950,6 +1035,10 @@ class MyAccount extends React.Component {
         let newUser = userCredential.user;
         newUser.updatePassword(this.state.newPass1).then(() => {
           alert("Your password has just been updated.");
+
+          // Store the user's new credentials so that they remain signed in.
+          AsyncStorage.setItem("@userPassword", password);
+
           this.switchMode();
         }).catch((error) => {
           alert("Could not reset password. Please make sure your new password is over 6 characters long.")
@@ -962,7 +1051,7 @@ class MyAccount extends React.Component {
         if(this.state.password == ""){
           alert("Please confirm your current password to change it.");
         } else {
-          alert(errorMessage);
+          //alert(errorMessage);
           alert("Password is incorrect. Please try again.");
         }
       });
@@ -1022,6 +1111,7 @@ class App extends React.Component{
     this.loadFonts = this.loadFonts.bind(this);
     this.signOut = this.signOut.bind(this);
     let user = firebase.auth().currentUser;
+    
     if(user != undefined && user != null){
       this.state = {
         currUser: user,
@@ -1061,6 +1151,7 @@ class App extends React.Component{
 
   signOut(){
     firebase.auth().signOut().then(() => {
+      AsyncStorage.clear();
       this.setState({
         currUser: null,
         activity: 'login',
@@ -1078,7 +1169,7 @@ class App extends React.Component{
     });
   }
 
-  async loadFonts() {
+  async loadFonts(user) {
     await Font.loadAsync({
 
       'MyriadPro': require('./assets/fonts/MyriadPro-Regular.ttf'),
@@ -1087,11 +1178,49 @@ class App extends React.Component{
 
     });
 
-    this.setState({ fontsLoaded: true,});
+    if(user != null && user != undefined){
+      this.setState({ currUser: user, activity: 'dashboard', fontsLoaded: true});
+    } else {
+      this.setState({ currUser: user, fontsLoaded: true});
+    }
   }
 
   componentDidMount(){  
-    this.loadFonts();
+
+    if(this.state.currUser == undefined || this.state.currUser == null){
+
+      // Get the user's credentials from storage, if exists
+      const loginFromStorage = async () => {
+          try{
+            const email = await AsyncStorage.getItem("@userEmail");
+            const password = await AsyncStorage.getItem("@userPassword");
+
+            if(email != null && password != null){
+              firebase.auth().signInWithEmailAndPassword(email, password)
+              .then((userCredential) => {
+
+                console.log("Signed in");
+                let user = userCredential.user;
+                this.loadFonts(user);
+              })
+              .catch((error) => { 
+                let user = null;
+                this.loadFonts(user);
+              });
+            } else {
+              let user = null;
+              this.loadFonts(user);
+            }
+          } catch(e){ 
+            let user = null;
+            this.loadFonts(user);
+          }
+        }
+        loginFromStorage();
+    } else {
+      let user = this.state.currUser;
+      this.loadFonts(user);
+    }
     
   }
 
